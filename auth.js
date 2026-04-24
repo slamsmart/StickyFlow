@@ -151,7 +151,13 @@ async function initClerk() {
           );
           return null;
         }
-        console.info("[StickyFlow] Got Clerk JWT for Convex.");
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          console.info("[StickyFlow] JWT payload:", {
+            iss: payload.iss, aud: payload.aud, sub: payload.sub,
+            exp: new Date(payload.exp * 1000).toISOString(),
+          });
+        } catch {}
         return token;
       } catch (err) {
         showAuthError(
