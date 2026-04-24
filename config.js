@@ -17,6 +17,7 @@ window.STICKYFLOW_CONFIG = {
   CONVEX_URL: "https://quiet-octopus-611.convex.cloud",
 
   /* Name of the Clerk JWT template used by Convex.
-   * Must match `applicationID` in convex/auth.config.ts. */
-  CLERK_JWT_TEMPLATE: "convex",
+   * This is the template NAME in Clerk dashboard (what we pass to getToken({ template })).
+   * The template's `aud` claim must match `applicationID` in convex/auth.config.ts ("convex"). */
+  CLERK_JWT_TEMPLATE: "convex2",
 };
