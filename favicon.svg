@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Blue note (back) -->
+  <rect x="20" y="18" width="34" height="36" rx="5" fill="#3aa8ff" transform="rotate(6 37 36)"/>
+  <!-- Pink note (middle) -->
+  <rect x="16" y="14" width="34" height="36" rx="5" fill="#ff5e6e" transform="rotate(3 33 32)"/>
+  <!-- Yellow note (front) with curled corner -->
+  <path d="M10 10 h30 a4 4 0 0 1 4 4 v28 a4 4 0 0 1 -4 4 h-22 l-8 -8 v-24 a4 4 0 0 1 4 -4 z" fill="#ffd23a"/>
+  <!-- Curled corner shadow -->
+  <path d="M10 38 h8 v8 z" fill="#e6b820"/>
+  <!-- "S" letter -->
+  <text x="27" y="36" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="900" fill="#1a2440">S</text>
+  <!-- Purple pushpin -->
+  <circle cx="32" cy="8" r="5" fill="#a284ff"/>
+  <circle cx="30.5" cy="6.5" r="1.6" fill="#d9c9ff"/>
+</svg>
