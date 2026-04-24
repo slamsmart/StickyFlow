@@ -1,0 +1,21 @@
+# deps
+node_modules/
+
+# secrets
+.env
+.env.local
+.env.*.local
+
+# convex generated
+convex/_generated/
+
+# build artifacts next to .ts
+convex/*.js
+convex/*.js.map
+
+# unrelated scaffold
+clerk-nextjs/
+
+# misc
+*.log
+.DS_Store

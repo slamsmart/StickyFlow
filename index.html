@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StickyFlow — Notes & To-Do</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-grid"></div>
+
+  <!-- ===== Auth Gate (shown when signed out) ===== -->
+  <div id="authGate" class="auth-gate">
+    <div class="auth-card">
+      <div class="pushpin"></div>
+      <h1 class="auth-brand">
+        <span class="g-pink">Sticky</span><span class="g-purple">Flow</span>
+      </h1>
+      <p class="auth-tagline">Your notes &amp; to-dos, synced to every device.</p>
+      <div id="clerkSignIn" class="clerk-mount"></div>
+      <p class="auth-hint" id="authHint">Loading sign-in…</p>
+    </div>
+  </div>
+
+  <!-- ===== App (shown when signed in) ===== -->
+  <div id="app" class="hidden">
+    <header class="hero">
+      <div class="top-bar">
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <span class="brand-name">
+            <span class="g-pink">Sticky</span><span class="g-purple">Flow</span>
+          </span>
+        </div>
+        <div id="clerkUserButton" class="user-slot"></div>
+      </div>
+
+      <h1>
+        <span class="g-pink">Sticky</span>
+        <span class="g-purple">Flow</span>
+        <span class="sub">for busy minds</span>
+      </h1>
+      <p class="tagline">Remember notes &amp; to-dos — clean, colorful, synced.</p>
+
+      <div class="toolbar">
+        <button id="addNoteBtn" class="btn primary">+ New Note</button>
+        <button id="addTodoBtn" class="btn secondary">+ New To-Do</button>
+        <div class="filters">
+          <button class="chip active" data-filter="all">All</button>
+          <button class="chip" data-filter="note">Notes</button>
+          <button class="chip" data-filter="todo">To-Do</button>
+        </div>
+        <input id="searchInput" class="search" type="text" placeholder="Search notes..." />
+        <div class="zoom-controls" title="Ctrl + scroll to zoom">
+          <button id="zoomOut" class="zoom-btn" aria-label="Zoom out">−</button>
+          <button id="zoomReset" class="zoom-level" aria-label="Reset zoom"><span id="zoomLevel">100%</span></button>
+          <button id="zoomIn" class="zoom-btn" aria-label="Zoom in">+</button>
+        </div>
+      </div>
+      <p class="hint">
+        Tip: hold <kbd>Ctrl</kbd> + scroll to zoom · drag scroll horizontally
+        <span id="syncStatus" class="sync-status"></span>
+      </p>
+    </header>
+
+    <main class="dashboard">
+      <button class="scroll-btn left" id="scrollLeft" aria-label="Scroll left">‹</button>
+      <section id="notesTrack" class="notes-track"></section>
+      <button class="scroll-btn right" id="scrollRight" aria-label="Scroll right">›</button>
+
+      <div id="emptyState" class="empty-state hidden">
+        <div class="empty-card">
+          <div class="pushpin"></div>
+          <h3>No notes yet</h3>
+          <p>Tap <strong>+ New Note</strong> or <strong>+ New To-Do</strong> to get started.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ===== Modal ===== -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-card">
+      <button class="modal-close" id="modalClose" aria-label="Close">×</button>
+      <h2 id="modalTitle">New Note</h2>
+
+      <label class="field">
+        <span>Title</span>
+        <input id="fTitle" type="text" placeholder="e.g. Groceries, Meeting ideas..." maxlength="60" />
+      </label>
+
+      <div id="noteBody" class="field">
+        <label><span>Content</span>
+          <textarea id="fContent" rows="5" placeholder="Write your thoughts..."></textarea>
+        </label>
+      </div>
+
+      <div id="todoBody" class="field hidden">
+        <span>Tasks</span>
+        <ul id="taskList" class="task-list"></ul>
+        <div class="add-task-row">
+          <input id="newTaskInput" type="text" placeholder="Add a task and press Enter" />
+          <button class="btn small" id="addTaskBtn">Add</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span>Color</span>
+        <div class="color-picker" id="colorPicker"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn ghost" id="cancelBtn">Cancel</button>
+        <button class="btn primary" id="saveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script type="module" src="auth.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
