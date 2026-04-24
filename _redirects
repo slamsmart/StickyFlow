@@ -1,0 +1,5 @@
+# Cloudflare Pages redirects
+# Docs: https://developers.cloudflare.com/pages/configuration/redirects/
+
+# SPA fallback — any unknown path serves the app (Clerk uses path-based flows like /sign-in)
+/*  /index.html  200

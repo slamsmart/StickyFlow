@@ -2,6 +2,8 @@
 
 Clean, colorful sticky-notes web app with **Clerk auth** and **Convex** as the realtime database. Pastel notes with pushpins, 2-row horizontal dashboard, mouse-wheel zoom.
 
+> **Deploy**: See [`DEPLOY.md`](./DEPLOY.md) for one-click Cloudflare Pages setup.
+
 ## Architecture
 
 - **Frontend:** static HTML/CSS/JS (no bundler). `auth.js` is an ES module that imports Convex from `esm.sh`.
