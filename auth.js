@@ -27,6 +27,22 @@ function showFatal(html) {
   if (hint) hint.innerHTML = html;
 }
 
+/** Visible toast for auth/convex errors (doesn't break app). */
+function showAuthError(msg) {
+  console.error("[StickyFlow]", msg);
+  let toast = document.getElementById("stickyflowToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "stickyflowToast";
+    toast.className = "sf-toast";
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(showAuthError._t);
+  showAuthError._t = setTimeout(() => toast.classList.remove("show"), 8000);
+}
+
 /* ---------- Decode Clerk Frontend API from pk ---------- */
 let frontendApi;
 try {
@@ -51,7 +67,17 @@ window.stickyflowDB = {
       "notes:list",
       {},
       (result) => onChange(result || []),
-      (err) => console.error("[convex:list]", err),
+      (err) => {
+        const msg = String(err && err.message || err);
+        if (msg.includes("UNAUTHENTICATED") || msg.includes("No auth")) {
+          showAuthError(
+            "Convex rejected your auth. Check: (1) JWT template named 'convex' exists in Clerk, " +
+            "(2) CLERK_JWT_ISSUER_DOMAIN on Convex matches the issuer shown in that template.",
+          );
+        } else {
+          showAuthError("Convex error: " + msg);
+        }
+      },
     );
     return () => {
       if (currentSubscription) currentSubscription();
@@ -112,11 +138,26 @@ async function initClerk() {
 
     /* Wire Convex auth to Clerk session tokens. */
     convex.setAuth(async () => {
-      if (!Clerk.session) return null;
+      if (!Clerk.session) {
+        console.info("[StickyFlow] No Clerk session yet.");
+        return null;
+      }
       try {
-        return await Clerk.session.getToken({ template: jwtTemplate });
+        const token = await Clerk.session.getToken({ template: jwtTemplate });
+        if (!token) {
+          showAuthError(
+            `Clerk JWT template "${jwtTemplate}" returned empty. ` +
+            `Create a template named exactly "${jwtTemplate}" in Clerk Dashboard → JWT Templates.`,
+          );
+          return null;
+        }
+        console.info("[StickyFlow] Got Clerk JWT for Convex.");
+        return token;
       } catch (err) {
-        console.warn(`Clerk JWT template "${jwtTemplate}" missing or failed:`, err);
+        showAuthError(
+          `Failed to get JWT for template "${jwtTemplate}". ` +
+          `Is it created in Clerk dashboard? ` + err.message,
+        );
         return null;
       }
     });

@@ -473,12 +473,104 @@ body > * { position: relative; z-index: 1; }
 }
 .site-footer a:hover { text-decoration: underline; }
 
-/* ---------- Responsive ---------- */
+/* ---------- Toast ---------- */
+.sf-toast {
+  position: fixed; left: 50%; bottom: 24px;
+  transform: translateX(-50%) translateY(120%);
+  background: #2a2a3a; color: #fff;
+  padding: 12px 18px; border-radius: 10px;
+  font-size: 13px; max-width: 90vw; line-height: 1.4;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+  z-index: 9999; opacity: 0; pointer-events: none;
+  transition: transform .25s ease, opacity .25s ease;
+}
+.sf-toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1; pointer-events: auto;
+}
+
+/* ---------- Responsive: tablet ---------- */
+@media (max-width: 960px) {
+  .hero { padding: 28px 20px 12px; }
+  .top-bar { margin-bottom: 16px; }
+  .hero h1 { font-size: 44px; }
+  .tagline { margin-bottom: 18px; }
+  .toolbar {
+    flex-wrap: wrap; gap: 8px;
+    justify-content: stretch;
+  }
+  .search { min-width: 180px; flex: 1 1 180px; }
+  .filters { flex-wrap: wrap; }
+}
+
+/* ---------- Responsive: phone ---------- */
 @media (max-width: 720px) {
-  .hero { padding: 32px 20px 16px; }
-  .notes-track { padding: 30px 20px 60px; gap: 24px; }
+  .hero { padding: 22px 14px 10px; }
+  .top-bar { padding: 0 4px; }
+  .brand-name { display: none; } /* keep just the mark on small screens */
+  .hero h1 { font-size: 34px; letter-spacing: -0.5px; }
+  .sub { font-size: 0.7em; }
+  .tagline { font-size: 13px; margin-bottom: 14px; }
+  .hint { font-size: 11px; text-align: center; }
+
+  /* Toolbar: compact grid */
+  .toolbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .toolbar .btn { padding: 10px 14px; font-size: 13px; }
+  .toolbar .search { grid-column: 1 / -1; min-width: 0; width: 100%; }
+  .toolbar .filters {
+    grid-column: 1 / -1;
+    justify-content: center; gap: 6px; margin-left: 0;
+  }
+  .toolbar .chip { padding: 7px 12px; font-size: 12px; }
+  .toolbar .zoom-controls { grid-column: 1 / -1; justify-self: center; }
+
+  /* Dashboard: single vertical column on phones */
+  .dashboard { padding: 20px 0 40px; }
+  .notes-track {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    padding: 20px 16px 40px;
+    overflow-x: hidden;
+    overflow-y: visible;
+    transform: none !important; /* disable zoom on mobile */
+  }
+  .note {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+    transform: none !important; /* straighten rotation for cleaner mobile view */
+  }
+  .note:hover { transform: none !important; }
   .scroll-btn { display: none; }
-  .search { min-width: 0; flex: 1; }
-  .toolbar { flex-direction: column; align-items: stretch; }
-  .filters { justify-content: center; margin-left: 0; }
+
+  /* Auth card */
+  .auth-card {
+    padding: 36px 24px 24px;
+    transform: rotate(-1deg);
+  }
+  .auth-brand { font-size: 34px; }
+
+  /* Modal */
+  .modal { padding: 12px; }
+  .modal-card { padding: 22px 18px 18px; border-radius: 14px; }
+  .modal-card h2 { font-size: 18px; }
+  .color-swatch { width: 30px; height: 30px; }
+
+  /* Footer */
+  .site-footer { font-size: 12px; padding: 22px 14px 28px; flex-wrap: wrap; text-align: center; }
+
+  /* Toast */
+  .sf-toast { font-size: 12px; padding: 10px 14px; bottom: 16px; }
+}
+
+/* ---------- Responsive: very small phones ---------- */
+@media (max-width: 380px) {
+  .hero h1 { font-size: 28px; }
+  .toolbar { grid-template-columns: 1fr; }
+  .note { padding: 22px 18px 16px; }
 }

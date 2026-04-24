@@ -12,6 +12,18 @@ function storageKey() { return `stickyflow.notes.${CURRENT_USER_ID}`; }
 let convexUnsub = null;
 let suppressSubscribe = false; // avoid re-render loops on our own writes
 
+function flashConvexError(op, e) {
+  const msg = String(e && e.message || e);
+  console.warn(`[StickyFlow] Convex ${op} failed:`, e);
+  const toast = document.getElementById('stickyflowToast');
+  if (toast) {
+    toast.textContent = `Convex ${op} failed: ${msg.slice(0, 200)}`;
+    toast.classList.add('show');
+    clearTimeout(flashConvexError._t);
+    flashConvexError._t = setTimeout(() => toast.classList.remove('show'), 8000);
+  }
+}
+
 async function cloudUpsert(note) {
   if (!window.stickyflowDB || !window.clerk || !window.clerk.user) return;
   try {
@@ -19,7 +31,7 @@ async function cloudUpsert(note) {
     await window.stickyflowDB.upsert(note);
     setSyncStatus('synced');
   } catch (e) {
-    console.warn('Convex upsert failed:', e);
+    flashConvexError('upsert', e);
     setSyncStatus('error');
   }
 }
@@ -30,7 +42,7 @@ async function cloudRemove(clientId) {
     await window.stickyflowDB.remove(clientId);
     setSyncStatus('synced');
   } catch (e) {
-    console.warn('Convex remove failed:', e);
+    flashConvexError('remove', e);
     setSyncStatus('error');
   }
 }
