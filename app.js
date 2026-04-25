@@ -65,6 +65,7 @@ let editingId = null;
 let modalMode = 'note';
 let selectedColor = 'yellow';
 let draftTasks = [];
+let copiedNote = null;
 
 /* ---------- Storage ---------- */
 function loadLocal() {
@@ -200,6 +201,14 @@ function render() {
     return hay.includes(q);
   });
 
+  /* Pinned notes always on top */
+  filtered.sort((a, b) => {
+    const pa = a.pinned ? 1 : 0;
+    const pb = b.pinned ? 1 : 0;
+    if (pa !== pb) return pb - pa;
+    return (b.order || 0) - (a.order || 0);
+  });
+
   track.innerHTML = '';
   if (filtered.length === 0) {
     emptyState.classList.remove('hidden');
@@ -217,16 +226,20 @@ function renderNote(n) {
   // Rotation & number stable — based on createdAt, not display position
   const stableIdx = getStableRotIdx(n.id);
   const rot = `rot-${(stableIdx % 4) + 1}`;
-  el.className = `note c-${n.color} ${rot}`;
+  el.className = `note c-${n.color} ${rot} ${n.pinned ? 'pinned' : ''}`;
   el.dataset.id = n.id;
 
-  // Drag events
-  el.draggable = true;
+  // Only allow drag from the drag-handle so text selection works normally
+  el.draggable = false;
+  el.addEventListener('mousedown', (e) => {
+    if (e.target.closest('.drag-handle')) el.draggable = true;
+  });
+  el.addEventListener('mouseup', () => { el.draggable = false; });
   el.addEventListener('dragstart',  (e) => onDragStart(e, n.id));
   el.addEventListener('dragover',   (e) => onDragOver(e, n.id));
   el.addEventListener('dragleave',  (e) => onDragLeave(e, n.id));
   el.addEventListener('drop',       (e) => onDrop(e, n.id));
-  el.addEventListener('dragend',    (e) => onDragEnd(e, n.id));
+  el.addEventListener('dragend',    (e) => { onDragEnd(e, n.id); el.draggable = false; });
 
   const indexLabel = getNoteNumber(n.id);
 
@@ -248,6 +261,8 @@ function renderNote(n) {
         <span class="task-progress">${doneCount}/${tasks.length} done</span>
         <span>
           <button class="icon-btn" data-action="edit">Edit</button>
+          <button class="icon-btn copy" data-action="copy">Copy</button>
+          <button class="icon-btn ${n.pinned ? 'unpin' : 'pin'}" data-action="pin">${n.pinned ? 'Unpin' : 'Pin'}</button>
           <button class="icon-btn danger" data-action="delete">Delete</button>
         </span>
       </div>
@@ -259,6 +274,8 @@ function renderNote(n) {
         <span class="meta">${fmtDate(n.createdAt)}</span>
         <span>
           <button class="icon-btn" data-action="edit">Edit</button>
+          <button class="icon-btn copy" data-action="copy">Copy</button>
+          <button class="icon-btn ${n.pinned ? 'unpin' : 'pin'}" data-action="pin">${n.pinned ? 'Unpin' : 'Pin'}</button>
           <button class="icon-btn danger" data-action="delete">Delete</button>
         </span>
       </div>
@@ -269,7 +286,7 @@ function renderNote(n) {
     <div class="pushpin"></div>
     <div class="drag-handle" title="Drag to reorder">⠿</div>
     <div class="note-index">${indexLabel}</div>
-    <h3 class="note-title">${escapeHtml(n.title || 'Untitled')}</h3>
+    <h3 class="note-title copyable-text" title="Click to copy title">${escapeHtml(n.title || 'Untitled')}</h3>
     ${bodyHtml}
   `;
 
@@ -278,6 +295,8 @@ function renderNote(n) {
       e.stopPropagation();
       const action = btn.dataset.action;
       if (action === 'edit') openModal(n.type, n);
+      if (action === 'copy') copyNote(n.id);
+      if (action === 'pin') togglePin(n.id);
       if (action === 'delete') deleteNote(n.id);
     });
   });
@@ -291,6 +310,30 @@ function renderNote(n) {
     });
   });
 
+  /* Click-to-copy on title */
+  const titleEl = el.querySelector('.note-title');
+  if (titleEl) {
+    titleEl.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await navigator.clipboard.writeText(n.title || '');
+        flashToast('Title copied!');
+      } catch (err) { console.warn('Copy failed:', err); }
+    });
+  }
+
+  /* Click-to-copy on note content */
+  const contentEl = el.querySelector('.note-content');
+  if (contentEl) {
+    contentEl.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await navigator.clipboard.writeText(n.content || '');
+        flashToast('Content copied!');
+      } catch (err) { console.warn('Copy failed:', err); }
+    });
+  }
+
   return el;
 }
 
@@ -300,6 +343,79 @@ function deleteNote(id) {
   save();
   render();
   cloudRemove(id);
+}
+
+/* ---------- Copy / Paste ---------- */
+function copyNote(id) {
+  const n = notes.find(x => x.id === id);
+  if (!n) return;
+  copiedNote = JSON.parse(JSON.stringify(n));
+  delete copiedNote.id;
+  delete copiedNote.createdAt;
+  delete copiedNote.order;
+
+  const toast = document.getElementById('stickyflowToast');
+  if (toast) {
+    toast.textContent = 'Note copied! Click Paste to duplicate.';
+    toast.classList.add('show');
+    clearTimeout(copyNote._t);
+    copyNote._t = setTimeout(() => toast.classList.remove('show'), 2000);
+  }
+}
+
+function pasteNote() {
+  if (!copiedNote) {
+    const toast = document.getElementById('stickyflowToast');
+    if (toast) {
+      toast.textContent = 'Nothing to paste. Copy a note first.';
+      toast.classList.add('show');
+      clearTimeout(pasteNote._t);
+      pasteNote._t = setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+    return;
+  }
+  const now = Date.now();
+  const base = {
+    id: uid(),
+    type: copiedNote.type,
+    color: copiedNote.color,
+    title: copiedNote.title,
+    content: copiedNote.content,
+    tasks: copiedNote.tasks ? JSON.parse(JSON.stringify(copiedNote.tasks)) : undefined,
+    createdAt: now,
+    order: now,
+  };
+  notes.unshift(base);
+  save();
+  render();
+  cloudUpsert(base);
+
+  const toast = document.getElementById('stickyflowToast');
+  if (toast) {
+    toast.textContent = 'Note pasted!';
+    toast.classList.add('show');
+    clearTimeout(pasteNote._t);
+    pasteNote._t = setTimeout(() => toast.classList.remove('show'), 2000);
+  }
+}
+
+function togglePin(id) {
+  const n = notes.find(x => x.id === id);
+  if (!n) return;
+  n.pinned = !n.pinned;
+  if (n.pinned) n.order = Date.now() + 1e9;
+  save();
+  render();
+  cloudUpsert(n);
+}
+
+function flashToast(msg, ms = 1500) {
+  const toast = document.getElementById('stickyflowToast');
+  if (!toast) return;
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(flashToast._t);
+  flashToast._t = setTimeout(() => toast.classList.remove('show'), ms);
 }
 
 /* ---------- Modal ---------- */
@@ -458,17 +574,57 @@ track.addEventListener('wheel', (e) => {
   if (e.ctrlKey || e.metaKey) {
     e.preventDefault();
     setZoom(zoom + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
-  } else if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+  } else if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && track.scrollWidth > track.clientWidth) {
+    // Only hijack vertical wheel for horizontal scroll if there is actual horizontal overflow
     e.preventDefault();
     track.scrollLeft += e.deltaY;
   }
+  // Otherwise let native vertical scroll happen
 }, { passive: false });
+
+/* ---------- Drag-to-scroll (horizontal) ---------- */
+let isTrackDragging = false;
+let trackDragStartX = 0;
+let trackScrollStart = 0;
+
+track.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  if (e.target.closest('.note') || e.target.closest('button') || e.target.closest('input') || e.target.closest('a')) return;
+  isTrackDragging = true;
+  track.classList.add('dragging-track');
+  trackDragStartX = e.pageX;
+  trackScrollStart = track.scrollLeft;
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isTrackDragging) return;
+  e.preventDefault();
+  const dx = e.pageX - trackDragStartX;
+  track.scrollLeft = trackScrollStart - dx;
+});
+
+document.addEventListener('mouseup', () => {
+  if (!isTrackDragging) return;
+  isTrackDragging = false;
+  track.classList.remove('dragging-track');
+});
 
 /* ---------- Zoom ---------- */
 function setZoom(v) {
   zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(v * 100) / 100));
-  track.style.transform = `scale(${zoom})`;
-  track.style.transformOrigin = 'top left';
+
+  // Genuine reflow zoom: change note width & gap so cards fill free space
+  const trackEl = document.getElementById('notesTrack');
+  if (trackEl) {
+    const baseW = 268;
+    const baseGapX = 32;
+    const baseGapY = 48;
+    trackEl.style.setProperty('--note-width', `${Math.round(baseW * zoom)}px`);
+    trackEl.style.setProperty('--gap-x', `${Math.round(baseGapX * zoom)}px`);
+    trackEl.style.setProperty('--gap-y', `${Math.round(baseGapY * zoom)}px`);
+    trackEl.style.setProperty('--note-base-font', `${Math.max(10, Math.round(14 * zoom))}px`);
+  }
+
   const z = document.getElementById('zoomLevel');
   if (z) z.textContent = Math.round(zoom * 100) + '%';
   localStorage.setItem(ZOOM_KEY, String(zoom));
@@ -477,6 +633,77 @@ function setZoom(v) {
 document.getElementById('zoomIn').addEventListener('click', () => setZoom(zoom + ZOOM_STEP));
 document.getElementById('zoomOut').addEventListener('click', () => setZoom(zoom - ZOOM_STEP));
 document.getElementById('zoomReset').addEventListener('click', () => setZoom(1));
+
+/* ---------- Paste button ---------- */
+const pasteBtn = document.getElementById('pasteBtn');
+if (pasteBtn) pasteBtn.addEventListener('click', pasteNote);
+
+/* ---------- Copy selected text inside note (Google Keep style) ---------- */
+let selectionCopyBtn = null;
+
+function getSelectionCopyBtn() {
+  if (!selectionCopyBtn) {
+    selectionCopyBtn = document.createElement('button');
+    selectionCopyBtn.className = 'sf-selection-copy';
+    selectionCopyBtn.textContent = 'Copy';
+    selectionCopyBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const sel = window.getSelection();
+      if (sel && sel.toString().trim()) {
+        try {
+          await navigator.clipboard.writeText(sel.toString());
+          selectionCopyBtn.textContent = 'Copied!';
+          setTimeout(() => {
+            if (selectionCopyBtn) selectionCopyBtn.textContent = 'Copy';
+          }, 1200);
+        } catch (err) {
+          console.warn('Clipboard write failed:', err);
+        }
+      }
+      hideSelectionCopyBtn();
+    });
+    document.body.appendChild(selectionCopyBtn);
+  }
+  return selectionCopyBtn;
+}
+
+function showSelectionCopyBtn(rect) {
+  const btn = getSelectionCopyBtn();
+  btn.style.display = 'block';
+  btn.style.opacity = '1';
+  const offset = 8;
+  btn.style.left = `${window.scrollX + rect.left + (rect.width / 2) - (btn.offsetWidth / 2)}px`;
+  btn.style.top = `${window.scrollY + rect.top - btn.offsetHeight - offset}px`;
+}
+
+function hideSelectionCopyBtn() {
+  if (selectionCopyBtn) {
+    selectionCopyBtn.style.opacity = '0';
+    setTimeout(() => { if (selectionCopyBtn) selectionCopyBtn.style.display = 'none'; }, 150);
+  }
+}
+
+document.addEventListener('mouseup', () => {
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed) {
+    const range = sel.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    const noteEl = container.nodeType === 1 ? container.closest('.note') : container.parentElement?.closest('.note');
+    if (noteEl) {
+      const rect = range.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        showSelectionCopyBtn(rect);
+        return;
+      }
+    }
+  }
+  hideSelectionCopyBtn();
+});
+
+document.addEventListener('mousedown', (e) => {
+  if (e.target.closest('.sf-selection-copy')) return;
+  hideSelectionCopyBtn();
+});
 
 document.addEventListener('wheel', (e) => {
   if (e.ctrlKey || e.metaKey) e.preventDefault();
@@ -487,6 +714,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '=' || e.key === '+') { e.preventDefault(); setZoom(zoom + ZOOM_STEP); }
   else if (e.key === '-') { e.preventDefault(); setZoom(zoom - ZOOM_STEP); }
   else if (e.key === '0') { e.preventDefault(); setZoom(1); }
+  else if (e.key === 'v') { e.preventDefault(); pasteNote(); }
 });
 
 /* ---------- Init ---------- */
@@ -533,6 +761,7 @@ async function subscribeConvex() {
       title: c.title,
       content: c.content,
       tasks: c.tasks,
+      pinned: c.pinned,
       createdAt: c.createdAt,
       order: c.order,
     })).sort((a, b) => (b.order || 0) - (a.order || 0));
@@ -544,9 +773,14 @@ async function subscribeConvex() {
 
 window.addEventListener('stickyflow:user', (e) => bootForUser(e.detail));
 
-setTimeout(() => {
-  if (!window.clerk || !window.clerk.user) {
-    const appVisible = !document.getElementById('app').classList.contains('hidden');
-    if (appVisible) bootForUser(null);
-  }
-}, 1500);
+// If Clerk already loaded before this script, boot immediately
+if (window.clerk && window.clerk.user) {
+  bootForUser(window.clerk.user);
+} else {
+  setTimeout(() => {
+    if (!window.clerk || !window.clerk.user) {
+      const appVisible = !document.getElementById('app').classList.contains('hidden');
+      if (appVisible) bootForUser(null);
+    }
+  }, 1500);
+}

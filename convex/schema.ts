@@ -22,6 +22,7 @@ export default defineSchema({
     tasks: v.optional(
       v.array(v.object({ text: v.string(), done: v.boolean() })),
     ),
+    pinned: v.optional(v.boolean()),
     createdAt: v.number(),
     order: v.number(),
   })

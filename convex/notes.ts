@@ -15,6 +15,7 @@ const noteDocValidator = v.object({
   tasks: v.optional(
     v.array(v.object({ text: v.string(), done: v.boolean() })),
   ),
+  pinned: v.optional(v.boolean()),
   createdAt: v.number(),
   order: v.number(),
 });
@@ -28,6 +29,7 @@ const upsertArgsValidator = {
   tasks: v.optional(
     v.array(v.object({ text: v.string(), done: v.boolean() })),
   ),
+  pinned: v.optional(v.boolean()),
   createdAt: v.number(),
   order: v.number(),
 };
@@ -84,6 +86,7 @@ export const upsert = mutation({
         title: args.title,
         content: args.content,
         tasks: args.tasks,
+        pinned: args.pinned,
         order: args.order,
       });
       return existing._id;
@@ -97,6 +100,7 @@ export const upsert = mutation({
       title: args.title,
       content: args.content,
       tasks: args.tasks,
+      pinned: args.pinned,
       createdAt: args.createdAt,
       order: args.order,
     });
