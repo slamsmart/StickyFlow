@@ -354,24 +354,12 @@ function copyNote(id) {
   delete copiedNote.createdAt;
   delete copiedNote.order;
 
-  const toast = document.getElementById('stickyflowToast');
-  if (toast) {
-    toast.textContent = 'Note copied! Click Paste to duplicate.';
-    toast.classList.add('show');
-    clearTimeout(copyNote._t);
-    copyNote._t = setTimeout(() => toast.classList.remove('show'), 2000);
-  }
+  flashToast('Note copied! Click Paste to duplicate.', 2500);
 }
 
 function pasteNote() {
   if (!copiedNote) {
-    const toast = document.getElementById('stickyflowToast');
-    if (toast) {
-      toast.textContent = 'Nothing to paste. Copy a note first.';
-      toast.classList.add('show');
-      clearTimeout(pasteNote._t);
-      pasteNote._t = setTimeout(() => toast.classList.remove('show'), 2000);
-    }
+    flashToast('Nothing to paste. Copy a note first.', 2000);
     return;
   }
   const now = Date.now();
@@ -390,13 +378,7 @@ function pasteNote() {
   render();
   cloudUpsert(base);
 
-  const toast = document.getElementById('stickyflowToast');
-  if (toast) {
-    toast.textContent = 'Note pasted!';
-    toast.classList.add('show');
-    clearTimeout(pasteNote._t);
-    pasteNote._t = setTimeout(() => toast.classList.remove('show'), 2000);
-  }
+  flashToast('Note pasted!', 2000);
 }
 
 function togglePin(id) {
@@ -411,11 +393,18 @@ function togglePin(id) {
 
 function flashToast(msg, ms = 1500) {
   const toast = document.getElementById('stickyflowToast');
-  if (!toast) return;
+  if (!toast) {
+    console.warn('[StickyFlow] toast element not found');
+    return;
+  }
   toast.textContent = msg;
+  // Force re-trigger animation
+  toast.classList.remove('show');
+  void toast.offsetWidth; // reflow
   toast.classList.add('show');
   clearTimeout(flashToast._t);
   flashToast._t = setTimeout(() => toast.classList.remove('show'), ms);
+  console.log('[StickyFlow] toast:', msg);
 }
 
 /* ---------- Modal ---------- */
