@@ -703,7 +703,15 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '=' || e.key === '+') { e.preventDefault(); setZoom(zoom + ZOOM_STEP); }
   else if (e.key === '-') { e.preventDefault(); setZoom(zoom - ZOOM_STEP); }
   else if (e.key === '0') { e.preventDefault(); setZoom(1); }
-  else if (e.key === 'v') { e.preventDefault(); pasteNote(); }
+  else if (e.key === 'v') {
+    // Only paste note when NOT in an editable field — allow normal Ctrl+V text paste in inputs
+    const tag = document.activeElement?.tagName;
+    const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable;
+    if (!isEditable) {
+      e.preventDefault();
+      pasteNote();
+    }
+  }
 });
 
 /* ---------- Init ---------- */
