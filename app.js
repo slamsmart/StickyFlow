@@ -563,12 +563,9 @@ track.addEventListener('wheel', (e) => {
   if (e.ctrlKey || e.metaKey) {
     e.preventDefault();
     setZoom(zoom + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
-  } else if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && track.scrollWidth > track.clientWidth) {
-    // Only hijack vertical wheel for horizontal scroll if there is actual horizontal overflow
-    e.preventDefault();
-    track.scrollLeft += e.deltaY;
   }
-  // Otherwise let native vertical scroll happen
+  // Normal wheel scrolls vertically (up/down) naturally.
+  // Horizontal scroll (left/right) only via manual arrow buttons or drag-to-scroll.
 }, { passive: false });
 
 /* ---------- Drag-to-scroll (horizontal) ---------- */
