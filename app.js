@@ -4,13 +4,11 @@ const ZOOM_KEY = 'stickyflow.zoom';
 const MIN_ZOOM = 0.5, MAX_ZOOM = 2.0, ZOOM_STEP = 0.1;
 let zoom = parseFloat(localStorage.getItem(ZOOM_KEY)) || 1;
 
-/* User-scoped storage key. Changes when Clerk user signs in/out. */
 let CURRENT_USER_ID = 'guest';
 function storageKey() { return `stickyflow.notes.${CURRENT_USER_ID}`; }
 
-/* Cloud sync state (Convex) */
 let convexUnsub = null;
-let suppressSubscribe = false; // avoid re-render loops on our own writes
+let suppressSubscribe = false;
 
 function flashConvexError(op, e) {
   const msg = String(e && e.message || e);
@@ -64,12 +62,11 @@ let notes = [];
 let currentFilter = 'all';
 let searchQuery = '';
 let editingId = null;
-let modalMode = 'note'; // 'note' | 'todo'
+let modalMode = 'note';
 let selectedColor = 'yellow';
-let draftTasks = []; // [{text, done}]
+let draftTasks = [];
 
 /* ---------- Storage ---------- */
-/* localStorage is an offline cache; Convex is source of truth when signed in. */
 function loadLocal() {
   try {
     const raw = localStorage.getItem(storageKey());
@@ -79,7 +76,6 @@ function loadLocal() {
 function saveLocal() {
   localStorage.setItem(storageKey(), JSON.stringify(notes));
 }
-/** Called after any mutation — persists locally and (if signed in) to Convex. */
 function save() {
   saveLocal();
 }
@@ -89,17 +85,17 @@ function seedDemo() {
   return [
     { id: uid(), type: 'note', color: 'green', title: 'Welcome!',
       content: 'Click "+ New Note" to capture an idea or "+ New To-Do" for a task list.\n\nHover a note to lift it.',
-      createdAt: now },
+      createdAt: now, order: now },
     { id: uid(), type: 'todo', color: 'pink', title: 'Daily Goals',
       tasks: [
         { text: 'Drink water', done: true },
         { text: 'Read 10 pages', done: false },
         { text: 'Ship a feature', done: false },
       ],
-      createdAt: now + 1 },
+      createdAt: now + 1, order: now + 1 },
     { id: uid(), type: 'note', color: 'blue', title: 'Meeting Notes',
       content: 'Discuss Q4 roadmap, design review on Friday.',
-      createdAt: now + 2 },
+      createdAt: now + 2, order: now + 2 },
   ];
 }
 
@@ -113,6 +109,82 @@ function escapeHtml(s) {
 function fmtDate(ts) {
   const d = new Date(ts);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/* ---------- Stable note number ---------- */
+/* Number based on createdAt — never changes when notes are dragged/reordered */
+function getNoteNumber(id) {
+  const sorted = [...notes].sort((a, b) => a.createdAt - b.createdAt);
+  const idx = sorted.findIndex(n => n.id === id);
+  return String(idx + 1).padStart(2, '0');
+}
+
+function getStableRotIdx(id) {
+  const sorted = [...notes].sort((a, b) => a.createdAt - b.createdAt);
+  return sorted.findIndex(n => n.id === id);
+}
+
+/* ---------- Drag & Drop ---------- */
+let dragSrcId = null;
+let dragOverId = null;
+
+function onDragStart(e, id) {
+  dragSrcId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', id);
+  setTimeout(() => {
+    const el = track.querySelector(`[data-id="${id}"]`);
+    if (el) el.classList.add('dragging');
+  }, 0);
+}
+
+function onDragOver(e, id) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (id === dragSrcId) return;
+  if (id !== dragOverId) {
+    if (dragOverId) {
+      const prev = track.querySelector(`[data-id="${dragOverId}"]`);
+      if (prev) prev.classList.remove('drag-over');
+    }
+    dragOverId = id;
+    const el = track.querySelector(`[data-id="${id}"]`);
+    if (el) el.classList.add('drag-over');
+  }
+}
+
+function onDragLeave(e, id) {
+  const el = track.querySelector(`[data-id="${id}"]`);
+  if (el) el.classList.remove('drag-over');
+  if (dragOverId === id) dragOverId = null;
+}
+
+function onDrop(e, targetId) {
+  e.preventDefault();
+  if (!dragSrcId || dragSrcId === targetId) return;
+
+  const srcIdx = notes.findIndex(n => n.id === dragSrcId);
+  const tgtIdx = notes.findIndex(n => n.id === targetId);
+  if (srcIdx === -1 || tgtIdx === -1) return;
+
+  const [moved] = notes.splice(srcIdx, 1);
+  notes.splice(tgtIdx, 0, moved);
+
+  // Update order for cloud sync — do NOT touch createdAt (keeps number stable)
+  const now = Date.now();
+  notes.forEach((n, i) => { n.order = now - i; });
+
+  save();
+  render();
+  notes.forEach(n => cloudUpsert(n));
+}
+
+function onDragEnd(e, id) {
+  dragSrcId = null;
+  dragOverId = null;
+  track.querySelectorAll('.dragging, .drag-over').forEach(el => {
+    el.classList.remove('dragging', 'drag-over');
+  });
 }
 
 /* ---------- Render ---------- */
@@ -135,17 +207,29 @@ function render() {
   } else {
     emptyState.classList.add('hidden');
     track.style.display = '';
-    filtered.forEach((n, i) => track.appendChild(renderNote(n, i)));
+    filtered.forEach((n) => track.appendChild(renderNote(n)));
   }
 }
 
-function renderNote(n, idx) {
+function renderNote(n) {
   const el = document.createElement('article');
-  const rot = `rot-${(idx % 4) + 1}`;
+
+  // Rotation & number stable — based on createdAt, not display position
+  const stableIdx = getStableRotIdx(n.id);
+  const rot = `rot-${(stableIdx % 4) + 1}`;
   el.className = `note c-${n.color} ${rot}`;
   el.dataset.id = n.id;
 
-  const indexLabel = String(idx + 1).padStart(2, '0');
+  // Drag events
+  el.draggable = true;
+  el.addEventListener('dragstart',  (e) => onDragStart(e, n.id));
+  el.addEventListener('dragover',   (e) => onDragOver(e, n.id));
+  el.addEventListener('dragleave',  (e) => onDragLeave(e, n.id));
+  el.addEventListener('drop',       (e) => onDrop(e, n.id));
+  el.addEventListener('dragend',    (e) => onDragEnd(e, n.id));
+
+  const indexLabel = getNoteNumber(n.id);
+
   let bodyHtml = '';
 
   if (n.type === 'todo') {
@@ -183,12 +267,12 @@ function renderNote(n, idx) {
 
   el.innerHTML = `
     <div class="pushpin"></div>
+    <div class="drag-handle" title="Drag to reorder">⠿</div>
     <div class="note-index">${indexLabel}</div>
     <h3 class="note-title">${escapeHtml(n.title || 'Untitled')}</h3>
     ${bodyHtml}
   `;
 
-  // Events
   el.querySelectorAll('[data-action]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -370,7 +454,6 @@ document.getElementById('scrollRight').addEventListener('click', () => {
   track.scrollBy({ left: 340, behavior: 'smooth' });
 });
 
-/* Wheel: Ctrl = zoom, otherwise horizontal scroll */
 track.addEventListener('wheel', (e) => {
   if (e.ctrlKey || e.metaKey) {
     e.preventDefault();
@@ -395,12 +478,10 @@ document.getElementById('zoomIn').addEventListener('click', () => setZoom(zoom +
 document.getElementById('zoomOut').addEventListener('click', () => setZoom(zoom - ZOOM_STEP));
 document.getElementById('zoomReset').addEventListener('click', () => setZoom(1));
 
-/* Prevent browser page zoom on Ctrl+wheel over the app */
 document.addEventListener('wheel', (e) => {
   if (e.ctrlKey || e.metaKey) e.preventDefault();
 }, { passive: false });
 
-/* Keyboard zoom: Ctrl +/-/0 */
 document.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey)) return;
   if (e.key === '=' || e.key === '+') { e.preventDefault(); setZoom(zoom + ZOOM_STEP); }
@@ -417,7 +498,6 @@ function bootForUser(user) {
   render();
   setZoom(zoom);
 
-  // Tear down any previous subscription.
   if (convexUnsub) { convexUnsub(); convexUnsub = null; }
 
   if (user && window.stickyflowDB) {
@@ -430,7 +510,6 @@ function bootForUser(user) {
 async function subscribeConvex() {
   let firstResult = true;
   convexUnsub = window.stickyflowDB.subscribe(async (cloudNotes) => {
-    // One-time migration: if cloud is empty on first load, push local notes up.
     if (firstResult) {
       firstResult = false;
       if ((!cloudNotes || cloudNotes.length === 0) && notes.length > 0 && !migrationAttempted) {
@@ -443,11 +522,10 @@ async function subscribeConvex() {
           console.warn('Migration failed:', e);
           setSyncStatus('error');
         }
-        return; // subscription will fire again with the inserted notes
+        return;
       }
     }
 
-    // Adopt cloud state as source of truth.
     notes = (cloudNotes || []).map((c) => ({
       id: c.clientId,
       type: c.type,
@@ -464,10 +542,8 @@ async function subscribeConvex() {
   });
 }
 
-/* Wait for Clerk to tell us which user signed in; fall back to guest. */
 window.addEventListener('stickyflow:user', (e) => bootForUser(e.detail));
 
-/* If Clerk isn't configured / loads later, boot as guest after a short grace. */
 setTimeout(() => {
   if (!window.clerk || !window.clerk.user) {
     const appVisible = !document.getElementById('app').classList.contains('hidden');
